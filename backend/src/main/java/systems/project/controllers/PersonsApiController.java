@@ -10,7 +10,7 @@ import systems.project.models.envelopes.PersonEnvelope;
 import systems.project.services.PersonService;
 
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @CrossOrigin(origins = {"*"})
@@ -23,62 +23,77 @@ public class PersonsApiController implements PersonsApi {
     }
 
     @Override
-    public ResponseEntity<AbstractResponse> addPerson(Person person) {
-        try {
-            Map<String, Boolean> res = personService.addPerson(person).join();
-            boolean ok = Boolean.TRUE.equals(res.get("status"));
-            if (ok) {
-                return ResponseEntity.ok(
-                        AbstractResponse.builder()
-                                .status("ok")
-                                .title("Успех")
-                                .message("Человек создан")
+    public CompletableFuture<ResponseEntity<AbstractResponse<Person>>> addPerson(Person person) {
+        return personService.addPerson(person)
+                .thenApply(res -> {
+                    boolean ok = res != null && Boolean.TRUE.equals(res.get("status"));
+                    if (ok) {
+                        return ResponseEntity.ok(
+                                AbstractResponse.<Person>builder()
+                                        .status("ok")
+                                        .title("Успех")
+                                        .message("Человек создан")
+                                        .data(person)
+                                        .build()
+                        );
+                    }
+
+                    boolean passportConflict = res != null && Boolean.TRUE.equals(res.get("passportId"));
+                    if (passportConflict) {
+                        return ResponseEntity.badRequest().body(
+                                AbstractResponse.<Person>builder()
+                                        .status("error")
+                                        .title("Ошибка")
+                                        .message("passportId должен быть уникален")
+                                        .data(null)
+                                        .build()
+                        );
+                    }
+
+                    return ResponseEntity.badRequest().body(
+                            AbstractResponse.<Person>builder()
+                                    .status("error")
+                                    .title("Ошибка")
+                                    .message("Ошибка во время добавления")
+                                    .data(null)
+                                    .build()
+                    );
+                })
+                .exceptionally(ex -> ResponseEntity.badRequest().body(
+                        AbstractResponse.<Person>builder()
+                                .status("error")
+                                .title("Ошибка")
+                                .message(ex.getMessage())
+                                .data(null)
                                 .build()
-                );
-            }
-            return ResponseEntity.badRequest().body(
-                    AbstractResponse.builder()
-                            .status("error")
-                            .title("Ошибка")
-                            .message("Ошибка при создании человека")
-                            .build()
-            );
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(
-                    AbstractResponse.builder()
-                            .status("error")
-                            .title("Ошибка")
-                            .message(e.getMessage())
-                            .build()
-            );
-        }
+                ));
     }
 
-    @Override
-    public ResponseEntity<AbstractResponse<PersonEnvelope>> getPersons() {
-        try {
-            Map<String, List<Person>> map = personService.getPersons().join();
-            List<Person> persons = map.get("persons");
-            PersonEnvelope envelope = new PersonEnvelope();
-            envelope.setPersonList(persons);
 
-            return ResponseEntity.ok(
-                    AbstractResponse.<PersonEnvelope>builder()
-                            .status("ok")
-                            .title("Успех")
-                            .message("Список людей")
-                            .data(envelope)
-                            .build()
-            );
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(
-                    AbstractResponse.<PersonEnvelope>builder()
-                            .status("error")
-                            .title("Ошибка")
-                            .message(e.getMessage())
-                            .data(null)
-                            .build()
-            );
-        }
+    @Override
+    public CompletableFuture<ResponseEntity<AbstractResponse<PersonEnvelope>>> getPersons() {
+        return personService.getPersons()
+                .thenApply(map -> {
+                    List<Person> persons = map == null ? null : map.get("persons");
+                    PersonEnvelope envelope = new PersonEnvelope();
+                    envelope.setPersonList(persons);
+
+                    return ResponseEntity.ok(
+                            AbstractResponse.<PersonEnvelope>builder()
+                                    .status("ok")
+                                    .title("Успех")
+                                    .message("Список людей")
+                                    .data(envelope)
+                                    .build()
+                    );
+                })
+                .exceptionally(ex -> ResponseEntity.badRequest().body(
+                        AbstractResponse.<PersonEnvelope>builder()
+                                .status("error")
+                                .title("Ошибка")
+                                .message(ex.getMessage())
+                                .data(null)
+                                .build()
+                ));
     }
 }

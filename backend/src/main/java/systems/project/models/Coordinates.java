@@ -9,6 +9,8 @@ import jakarta.persistence.Column;
 
 import lombok.Data;
 
+import java.util.Objects;
+
 @Entity
 @Data
 public class Coordinates {
@@ -28,4 +30,18 @@ public class Coordinates {
 
     @Column(nullable = false)
     private Float y; //Поле не может быть null
+
+
+    @Override
+    public boolean equals(Object other) {
+        if (other == null) return false;
+        if (!(other instanceof Coordinates)) return false;
+        Coordinates coord = (Coordinates) other;
+        return this.x == coord.getX() && Objects.equals(this.y, coord.getY());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(this.x, this.y);
+    }
 }

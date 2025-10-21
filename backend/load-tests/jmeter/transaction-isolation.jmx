@@ -1,0 +1,452 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.6.0">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Transactional Isolation Plan" enabled="true">
+      <stringProp name="TestPlan.comments">Covers ticket create/update/delete/import plus uniqueness/contention checks.</stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments">
+          <elementProp name="protocol" elementType="Argument">
+            <stringProp name="Argument.name">protocol</stringProp>
+            <stringProp name="Argument.value">http</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="server" elementType="Argument">
+            <stringProp name="Argument.name">server</stringProp>
+            <stringProp name="Argument.value">localhost</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="port" elementType="Argument">
+            <stringProp name="Argument.name">port</stringProp>
+            <stringProp name="Argument.value">8080</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+        </collectionProp>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Isolation Load" enabled="true">
+        <intProp name="ThreadGroup.num_threads">10</intProp>
+        <intProp name="ThreadGroup.ramp_time">5</intProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <stringProp name="LoopController.loops">3</stringProp>
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <ConfigTestElement guiclass="HeaderPanel" testclass="ConfigTestElement" testname="HTTP Header Manager" enabled="true">
+          <collectionProp name="HeaderManager.headers">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="Content-Type" elementType="Argument">
+                <stringProp name="Argument.name">Content-Type</stringProp>
+                <stringProp name="Argument.value">application/json</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </collectionProp>
+        </ConfigTestElement>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Create Ticket" enabled="true">
+          <stringProp name="HTTPSampler.domain">${server}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.path">/add_ticket</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="HTTPArgument.contentType">application/json</stringProp>
+                <stringProp name="Argument.name"></stringProp>
+                <stringProp name="Argument.value">${createPayload}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <BeanShellPreProcessor guiclass="TestBeanGUI" testclass="BeanShellPreProcessor" testname="Generate Ticket Payload" enabled="true">
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <boolProp name="resetInterpreter">false</boolProp>
+            <stringProp name="script"><![CDATA[
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
+
+ThreadLocalRandom rnd = ThreadLocalRandom.current();
+String uid = UUID.randomUUID().toString();
+String ticketName = "load-" + uid;
+String comment = "comment-" + uid;
+String updatedComment = comment + "-upd";
+int price = 80 + rnd.nextInt(120);
+int number = 5 + rnd.nextInt(20);
+int coordX = rnd.nextInt(0, 200);
+float coordY = 1 + rnd.nextFloat() * 50f;
+
+vars.put("ticketName", ticketName);
+vars.put("comment", comment);
+vars.put("updatedComment", updatedComment);
+vars.put("price", Integer.toString(price));
+vars.put("updatePrice", Integer.toString(price + 15));
+vars.put("number", Integer.toString(number));
+vars.put("coordX", Integer.toString(coordX));
+vars.put("coordY", Float.toString(coordY));
+
+String payload = "{
+" +
+        "  "name": "" + ticketName + "",
+" +
+        "  "coordinates": { "x": " + coordX + ", "y": " + coordY + " },
+" +
+        "  "price": " + price + ",
+" +
+        "  "type": "VIP",
+" +
+        "  "number": " + number + ",
+" +
+        "  "comment": "" + comment + ""
+" +
+        "}
+";
+
+vars.put("createPayload", payload);
+]]></stringProp>
+          </BeanShellPreProcessor>
+          <hashTree/>
+          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="Extract Created Ticket" enabled="true">
+            <stringProp name="JSONPostProcessor.referenceNames">ticketId</stringProp>
+            <stringProp name="JSONPostProcessor.jsonPathExprs">$.data.id</stringProp>
+            <stringProp name="JSONPostProcessor.match_numbers">0</stringProp>
+            <stringProp name="JSONPostProcessor.defaultValues"></stringProp>
+            <boolProp name="JSONPostProcessor.compute_concat">false</boolProp>
+            <stringProp name="Sample.variable"></stringProp>
+          </JSONPostProcessor>
+          <hashTree/>
+          <BeanShellPostProcessor guiclass="TestBeanGUI" testclass="BeanShellPostProcessor" testname="Share Ticket Id" enabled="true">
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <boolProp name="resetInterpreter">false</boolProp>
+            <stringProp name="script"><![CDATA[
+String created = vars.get("ticketId");
+if (created != null && created.length() > 0) {
+    props.put("sharedTicketId", created);
+}
+]]></stringProp>
+          </BeanShellPostProcessor>
+          <hashTree/>
+          <BeanShellAssertion guiclass="BeanShellAssertionGui" testclass="BeanShellAssertion" testname="Assert Ticket Created" enabled="true">
+            <stringProp name="BeanShellAssertion.filename"></stringProp>
+            <stringProp name="BeanShellAssertion.parameters"></stringProp>
+            <boolProp name="BeanShellAssertion.resetInterpreter">false</boolProp>
+            <stringProp name="BeanShellAssertion.script"><![CDATA[
+int code = Integer.parseInt(prev.getResponseCode());
+if (code != 200) {
+    Failure = true;
+    FailureMessage = "Ticket create failed: " + prev.getResponseCode();
+}
+]]></stringProp>
+          </BeanShellAssertion>
+          <hashTree/>
+        </hashTree>
+        <GenericController guiclass="GenericControllerGui" testclass="GenericController" testname="Concurrent Ticket Ops" enabled="true"/>
+        <hashTree>
+          <BeanShellPreProcessor guiclass="TestBeanGUI" testclass="BeanShellPreProcessor" testname="Load Shared Ticket" enabled="true">
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <boolProp name="resetInterpreter">false</boolProp>
+            <stringProp name="script"><![CDATA[
+String shared = props.get("sharedTicketId");
+if (shared == null || shared.isEmpty()) {
+    shared = vars.get("ticketId");
+    if (shared != null) {
+        props.put("sharedTicketId", shared);
+    }
+}
+if (shared != null) {
+    vars.put("sharedTicketId", shared);
+}
+String comment = "concurrent-" + Thread.currentThread().getId();
+vars.put("updateCommentConcurrent", comment);
+]]></stringProp>
+          </BeanShellPreProcessor>
+          <hashTree/>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Sync Concurrent Updates" enabled="true">
+            <stringProp name="groupSize">5</stringProp>
+            <stringProp name="timeoutInMs">1000</stringProp>
+          </SyncTimer>
+          <hashTree/>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Concurrent Update Ticket" enabled="true">
+            <stringProp name="HTTPSampler.domain">${server}</stringProp>
+            <stringProp name="HTTPSampler.port">${port}</stringProp>
+            <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+            <stringProp name="HTTPSampler.path">/update_ticket/${sharedTicketId}</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="HTTPArgument.contentType">application/json</stringProp>
+                  <stringProp name="Argument.name"></stringProp>
+                  <stringProp name="Argument.value">{
+  "name": "concurrent-ticket",
+  "coordinates": { "x": 900, "y": 42.0 },
+  "price": 135,
+  "type": "VIP",
+  "number": 99,
+  "comment": "${updateCommentConcurrent}"
+}</stringProp>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <BeanShellAssertion guiclass="BeanShellAssertionGui" testclass="BeanShellAssertion" testname="Assert Update Result" enabled="true">
+              <stringProp name="BeanShellAssertion.filename"></stringProp>
+              <stringProp name="BeanShellAssertion.parameters"></stringProp>
+              <boolProp name="BeanShellAssertion.resetInterpreter">false</boolProp>
+              <stringProp name="BeanShellAssertion.script"><![CDATA[
+int code = Integer.parseInt(prev.getResponseCode());
+if (code != 200) {
+    Failure = true;
+    FailureMessage = "Ticket update failed: " + prev.getResponseCode();
+}
+]]></stringProp>
+            </BeanShellAssertion>
+            <hashTree/>
+          </hashTree>
+          <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Sync Concurrent Deletes" enabled="true">
+            <stringProp name="groupSize">5</stringProp>
+            <stringProp name="timeoutInMs">1000</stringProp>
+          </SyncTimer>
+          <hashTree/>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Concurrent Delete Ticket" enabled="true">
+            <stringProp name="HTTPSampler.domain">${server}</stringProp>
+            <stringProp name="HTTPSampler.port">${port}</stringProp>
+            <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+            <stringProp name="HTTPSampler.path">/delete_ticket/${sharedTicketId}</stringProp>
+            <stringProp name="HTTPSampler.method">DELETE</stringProp>
+            <stringProp name="HTTPSampler.contentEncoding"></stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+            <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+              <collectionProp name="Arguments.arguments"/>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <BeanShellAssertion guiclass="BeanShellAssertionGui" testclass="BeanShellAssertion" testname="Assert Delete Result" enabled="true">
+              <stringProp name="BeanShellAssertion.filename"></stringProp>
+              <stringProp name="BeanShellAssertion.parameters"></stringProp>
+              <boolProp name="BeanShellAssertion.resetInterpreter">false</boolProp>
+              <stringProp name="BeanShellAssertion.script"><![CDATA[
+int code = Integer.parseInt(prev.getResponseCode());
+if (code != 200 && code != 400) {
+    Failure = true;
+    FailureMessage = "Unexpected delete response: " + prev.getResponseCode();
+}
+]]></stringProp>
+            </BeanShellAssertion>
+            <hashTree/>
+          </hashTree>
+          <BeanShellPostProcessor guiclass="TestBeanGUI" testclass="BeanShellPostProcessor" testname="Clear Shared Ticket" enabled="true">
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <boolProp name="resetInterpreter">false</boolProp>
+            <stringProp name="script"><![CDATA[
+props.remove("sharedTicketId");
+]]></stringProp>
+          </BeanShellPostProcessor>
+          <hashTree/>
+        </hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Import Tickets" enabled="true">
+          <stringProp name="HTTPSampler.domain">${server}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.path">/tickets/import</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="HTTPArgument.contentType">application/json</stringProp>
+                <stringProp name="Argument.name"></stringProp>
+                <stringProp name="Argument.value">${importPayload}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <BeanShellPreProcessor guiclass="TestBeanGUI" testclass="BeanShellPreProcessor" testname="Generate Import Payload" enabled="true">
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <boolProp name="resetInterpreter">false</boolProp>
+            <stringProp name="script"><![CDATA[
+import java.util.UUID;
+
+String base = UUID.randomUUID().toString();
+String payload = "[
+" +
+        "  {
+" +
+        "    "name": "import-" + base + "-1",
+" +
+        "    "coordinates": { "x": 300, "y": 10.5 },
+" +
+        "    "price": 150,
+" +
+        "    "type": "USUAL",
+" +
+        "    "number": 3,
+" +
+        "    "comment": "batch-" + base + ""
+" +
+        "  },
+" +
+        "  {
+" +
+        "    "name": "import-" + base + "-2",
+" +
+        "    "coordinates": { "x": 301, "y": 11.5 },
+" +
+        "    "price": 175,
+" +
+        "    "type": "VIP",
+" +
+        "    "number": 4,
+" +
+        "    "comment": "batch-" + base + ""
+" +
+        "  }
+" +
+        "]
+";
+
+vars.put("importPayload", payload);
+]]></stringProp>
+          </BeanShellPreProcessor>
+          <hashTree/>
+          <BeanShellAssertion guiclass="BeanShellAssertionGui" testclass="BeanShellAssertion" testname="Assert Import Result" enabled="true">
+            <stringProp name="BeanShellAssertion.filename"></stringProp>
+            <stringProp name="BeanShellAssertion.parameters"></stringProp>
+            <boolProp name="BeanShellAssertion.resetInterpreter">false</boolProp>
+            <stringProp name="BeanShellAssertion.script"><![CDATA[
+int code = Integer.parseInt(prev.getResponseCode());
+if (code != 200) {
+    Failure = true;
+    FailureMessage = "Import failed: " + prev.getResponseCode();
+}
+]]></stringProp>
+          </BeanShellAssertion>
+          <hashTree/>
+        </hashTree>
+        <SyncTimer guiclass="TestBeanGUI" testclass="SyncTimer" testname="Sync Unique Constraint" enabled="true">
+          <stringProp name="groupSize">10</stringProp>
+          <stringProp name="timeoutInMs">1000</stringProp>
+        </SyncTimer>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Create Person (Passport Contention)" enabled="true">
+          <stringProp name="HTTPSampler.domain">${server}</stringProp>
+          <stringProp name="HTTPSampler.port">${port}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${protocol}</stringProp>
+          <stringProp name="HTTPSampler.path">/add_person</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="HTTPArgument.contentType">application/json</stringProp>
+                <stringProp name="Argument.name"></stringProp>
+                <stringProp name="Argument.value">${personPayload}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <BeanShellPreProcessor guiclass="TestBeanGUI" testclass="BeanShellPreProcessor" testname="Generate Person Payload" enabled="true">
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
+            <boolProp name="resetInterpreter">false</boolProp>
+            <stringProp name="script"><![CDATA[
+import java.util.concurrent.ThreadLocalRandom;
+
+String passport = props.get("sharedPassportId");
+if (passport == null) {
+    passport = "passport-" + System.currentTimeMillis();
+    props.put("sharedPassportId", passport);
+}
+ThreadLocalRandom rnd = ThreadLocalRandom.current();
+int locX = 400 + rnd.nextInt(100);
+float locY = 20f + rnd.nextFloat() * 10f;
+
+String payload = "{
+" +
+        "  "passportID": "" + passport + "",
+" +
+        "  "weight": 82.0,
+" +
+        "  "nationality": "GERMANY",
+" +
+        "  "hairColor": "BROWN",
+" +
+        "  "eyeColor": "GREEN",
+" +
+        "  "location": { "x": " + locX + ", "y": " + locY + ", "z": 5.0 }
+" +
+        "}
+";
+
+vars.put("personPayload", payload);
+]]></stringProp>
+          </BeanShellPreProcessor>
+          <hashTree/>
+          <BeanShellAssertion guiclass="BeanShellAssertionGui" testclass="BeanShellAssertion" testname="Allow Uniqueness Outcomes" enabled="true">
+            <stringProp name="BeanShellAssertion.filename"></stringProp>
+            <stringProp name="BeanShellAssertion.parameters"></stringProp>
+            <boolProp name="BeanShellAssertion.resetInterpreter">false</boolProp>
+            <stringProp name="BeanShellAssertion.script"><![CDATA[
+int code = Integer.parseInt(prev.getResponseCode());
+if (code != 200 && code != 400) {
+    Failure = true;
+    FailureMessage = "Unexpected response for person create: " + prev.getResponseCode();
+}
+]]></stringProp>
+          </BeanShellAssertion>
+          <hashTree/>
+        </hashTree>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>
