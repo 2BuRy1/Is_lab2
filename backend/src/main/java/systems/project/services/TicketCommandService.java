@@ -1,5 +1,11 @@
 package systems.project.services;
 
+import org.postgresql.util.PSQLException;
+import org.springframework.dao.CannotSerializeTransactionException;
+import org.springframework.dao.TransientDataAccessException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,6 +65,10 @@ public class TicketCommandService {
         }
     }
 
+    @Retryable(
+            retryFor = {CannotSerializeTransactionException.class, TransientDataAccessException.class},
+            maxAttempts = 5,
+            backoff = @Backoff(delay = 100, multiplier = 2, maxDelay = 1000))
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public Map<String, Boolean> addTicket(Ticket ticket) {
         try {
@@ -73,7 +83,8 @@ public class TicketCommandService {
                 return Map.of("status", true);
             }
             return Map.of("status", false, "invalidCompatibility", true);
-        } catch (Exception e) {
+        } catch (RuntimeException ex) {
+            throwIfSerializationConflict(ex);
             return Map.of("status", false);
         }
     }
@@ -86,6 +97,10 @@ public class TicketCommandService {
         }
     }
 
+    @Retryable(
+            retryFor = {CannotSerializeTransactionException.class, TransientDataAccessException.class},
+            maxAttempts = 5,
+            backoff = @Backoff(delay = 100, multiplier = 2, maxDelay = 1000))
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public boolean updateTicket(Integer id, Ticket ticket) {
         try {
@@ -95,11 +110,16 @@ public class TicketCommandService {
             ticket.setId(id);
             ticketRepository.save(ticket);
             return true;
-        } catch (Exception e) {
+        } catch (RuntimeException ex) {
+            throwIfSerializationConflict(ex);
             return false;
         }
     }
 
+    @Retryable(
+            retryFor = {CannotSerializeTransactionException.class, TransientDataAccessException.class},
+            maxAttempts = 5,
+            backoff = @Backoff(delay = 100, multiplier = 2, maxDelay = 1000))
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public boolean removeTicket(Integer id) {
         try {
@@ -108,11 +128,16 @@ public class TicketCommandService {
             }
             ticketRepository.deleteById(id);
             return true;
-        } catch (Exception e) {
+        } catch (RuntimeException ex) {
+            throwIfSerializationConflict(ex);
             return false;
         }
     }
 
+    @Retryable(
+            retryFor = {CannotSerializeTransactionException.class, TransientDataAccessException.class},
+            maxAttempts = 5,
+            backoff = @Backoff(delay = 100, multiplier = 2, maxDelay = 1000))
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public boolean deleteAllByComment(String comment) {
         try {
@@ -122,7 +147,8 @@ public class TicketCommandService {
             }
             Long removed = ticketRepository.deleteByComment(c);
             return removed != null && removed > 0;
-        } catch (Exception e) {
+        } catch (RuntimeException ex) {
+            throwIfSerializationConflict(ex);
             return false;
         }
     }
@@ -146,6 +172,10 @@ public class TicketCommandService {
         }
     }
 
+    @Retryable(
+            retryFor = {CannotSerializeTransactionException.class, TransientDataAccessException.class},
+            maxAttempts = 5,
+            backoff = @Backoff(delay = 100, multiplier = 2, maxDelay = 1000))
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public boolean sellTicket(Integer ticketId, Integer personId, float amount) {
         if (amount <= 0f) {
@@ -165,11 +195,16 @@ public class TicketCommandService {
             ticket.setPerson(personOpt.get());
             ticketRepository.save(ticket);
             return true;
-        } catch (Exception e) {
+        } catch (RuntimeException ex) {
+            throwIfSerializationConflict(ex);
             return false;
         }
     }
 
+    @Retryable(
+            retryFor = {CannotSerializeTransactionException.class, TransientDataAccessException.class},
+            maxAttempts = 5,
+            backoff = @Backoff(delay = 100, multiplier = 2, maxDelay = 1000))
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public Ticket cloneVip(Integer ticketId) {
         try {
@@ -200,7 +235,8 @@ public class TicketCommandService {
             }
 
             return ticketRepository.save(copy);
-        } catch (Exception e) {
+        } catch (RuntimeException ex) {
+            throwIfSerializationConflict(ex);
             return null;
         }
     }
@@ -438,5 +474,47 @@ public class TicketCommandService {
             }
         }
         return true;
+    }
+
+    private void throwIfSerializationConflict(RuntimeException ex) {
+        if (ex instanceof TransientDataAccessException) {
+            throw ex;
+        }
+        if (isSerializationConflict(ex)) {
+            throw cannotSerialize(ex);
+        }
+    }
+
+    private boolean isSerializationConflict(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof CannotSerializeTransactionException) {
+                return true;
+            }
+            if (current instanceof PSQLException psql && "40001".equals(psql.getSQLState())) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private CannotSerializeTransactionException cannotSerialize(Throwable ex) {
+        return new CannotSerializeTransactionException("Serialization conflict", ex);
+    }
+
+    @Recover
+    public Map<String, Boolean> recoverMapResult(TransientDataAccessException ex, Object... args) {
+        return Map.of("status", false);
+    }
+
+    @Recover
+    public boolean recoverBooleanResult(TransientDataAccessException ex, Object... args) {
+        return false;
+    }
+
+    @Recover
+    public Ticket recoverTicketResult(TransientDataAccessException ex, Object... args) {
+        return null;
     }
 }
