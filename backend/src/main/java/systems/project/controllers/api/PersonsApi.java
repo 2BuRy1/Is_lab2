@@ -25,6 +25,7 @@ import systems.project.models.api.AbstractResponse;
 import systems.project.models.envelopes.PersonEnvelope;
 
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 @Generated(value = "org.openapitools.codegen.languages.SpringCodegen",
         date = "2025-09-21T19:04:05.004649+03:00[Europe/Moscow]",
@@ -40,9 +41,9 @@ public interface PersonsApi {
     /**
      * POST /add_person : Создать человека
      *
-     * @param person  (required)
+     * @param person (required)
      * @return Создано (status code 200)
-     *         or Ошибка (status code 400)
+     * or Ошибка (status code 400)
      */
     @Operation(
         operationId = "addPerson",
@@ -63,8 +64,7 @@ public interface PersonsApi {
         produces = { "application/json" },
         consumes = { "application/json" }
     )
-    
-    ResponseEntity<AbstractResponse> addPerson(
+    CompletableFuture<ResponseEntity<AbstractResponse<Person>>> addPerson(
         @Parameter(name = "Person", description = "", required = true) @Valid @RequestBody Person person
     );
 
@@ -94,8 +94,6 @@ public interface PersonsApi {
         produces = { "application/json" }
     )
     
-    ResponseEntity<AbstractResponse<PersonEnvelope>> getPersons(
-        
-    );
+    CompletableFuture<ResponseEntity<AbstractResponse<PersonEnvelope>>> getPersons();
 
 }

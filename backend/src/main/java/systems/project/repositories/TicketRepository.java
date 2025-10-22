@@ -1,37 +1,26 @@
 package systems.project.repositories;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Repository;
 import systems.project.models.Ticket;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
 @Repository
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
+    List<Ticket> findAllBy();
 
+    Optional<Ticket> findById(Integer id);
 
-    @Async
-    CompletableFuture<List<Ticket>> findAllBy();
+    boolean existsById(Integer id);
 
-    @Async
-    CompletableFuture<Optional<Ticket>> findById(Integer id);
+    void deleteById(Integer id);
 
-    @Async
-    CompletableFuture<Boolean> existsById(Integer id);
+    Long deleteByComment(String comment);
 
-    @Async
-    CompletableFuture<Void> deleteById(Integer id);
+    Optional<Ticket> findFirstByEventIsNotNullOrderByEventIdAsc();
 
-    @Async
-    CompletableFuture<Long> deleteByComment(String comment);
-
-    @Async
-    CompletableFuture<Optional<Ticket>>  findFirstByEventIsNotNullOrderByEventIdAsc();
-
-    @Async
-    CompletableFuture<Long>countByCommentLessThan(String comment);
+    Long countByCommentLessThan(String comment);
 }

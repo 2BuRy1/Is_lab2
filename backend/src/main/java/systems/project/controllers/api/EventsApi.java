@@ -25,6 +25,7 @@ import systems.project.models.api.AbstractResponse;
 import systems.project.models.envelopes.EventsEnvelope;
 
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 @Generated(value = "org.openapitools.codegen.languages.SpringCodegen",
         date = "2025-09-21T19:04:05.004649+03:00[Europe/Moscow]",
@@ -64,7 +65,7 @@ public interface EventsApi {
         consumes = { "application/json" }
     )
     
-     ResponseEntity<AbstractResponse> addEvent(
+    CompletableFuture<ResponseEntity<AbstractResponse<Event>>> addEvent(
         @Parameter(name = "Event", description = "", required = true) @Valid @RequestBody Event event
     );
 
@@ -94,7 +95,6 @@ public interface EventsApi {
         produces = { "application/json" }
     )
     
-    ResponseEntity<AbstractResponse<EventsEnvelope>> getEvents(
-    );
+    CompletableFuture<ResponseEntity<AbstractResponse<EventsEnvelope>>> getEvents();
 
 }
