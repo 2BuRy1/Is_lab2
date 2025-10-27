@@ -191,6 +191,30 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ErrorResponse' }
 
+  /tickets/import:
+    post:
+      tags: [Tickets]
+      summary: Импортировать список билетов
+      operationId: importTickets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { $ref: '#/components/schemas/Ticket' }
+      responses:
+        '200':
+          description: Импорт завершён (data = ImportResult)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ImportResponse' }
+        '400':
+          description: Ошибка импорта
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
   /min_event_ticket:
     get:
       tags: [Tickets]
@@ -479,6 +503,22 @@ components:
           type: string
           nullable: true
           enum: [ LOFT, OPEN_AREA, STADIUM ]
+
+    ImportResult:
+      type: object
+      properties:
+        requested: { type: integer, format: int32 }
+        imported: { type: integer, format: int32 }
+        ticketIds:
+          type: array
+          items: { type: integer, format: int32 }
+
+    ImportResponse:
+      allOf:
+        - $ref: '#/components/schemas/AbstractResponse'
+      properties:
+        data:
+          $ref: '#/components/schemas/ImportResult'
 
     TicketsEnvelope:
       type: object

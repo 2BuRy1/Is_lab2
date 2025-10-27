@@ -2,6 +2,7 @@ package systems.project.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.hibernate.annotations.Check;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -16,6 +17,7 @@ import java.util.List;
 
 @Entity
 @Data
+@EqualsAndHashCode
 public class Event {
 
 

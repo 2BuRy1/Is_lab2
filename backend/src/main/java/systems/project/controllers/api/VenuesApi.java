@@ -21,6 +21,7 @@ import systems.project.models.Venue;
 import systems.project.models.envelopes.VenuesEnvelope;
 
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 @Generated(value = "org.openapitools.codegen.languages.SpringCodegen",
         date = "2025-09-21T19:04:05.004649+03:00[Europe/Moscow]",
@@ -36,9 +37,9 @@ public interface VenuesApi {
     /**
      * POST /add_venue : Создать площадку
      *
-     * @param venue  (required)
+     * @param venue (required)
      * @return Создано (status code 200)
-     *         or Ошибка (status code 400)
+     * or Ошибка (status code 400)
      */
     @Operation(
         operationId = "addVenue",
@@ -59,8 +60,7 @@ public interface VenuesApi {
         produces = { "application/json" },
         consumes = { "application/json" }
     )
-    
-    ResponseEntity<AbstractResponse> addVenue(
+    CompletableFuture<ResponseEntity<AbstractResponse<Venue>>> addVenue(
         @Parameter(name = "Venue", description = "", required = true) @Valid @RequestBody Venue venue
     );
 
@@ -90,6 +90,6 @@ public interface VenuesApi {
         produces = { "application/json" }
     )
 
-    ResponseEntity<AbstractResponse<VenuesEnvelope>> getVenues();
+    CompletableFuture<ResponseEntity<AbstractResponse<VenuesEnvelope>>> getVenues();
 
 }

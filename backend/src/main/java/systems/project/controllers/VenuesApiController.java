@@ -10,7 +10,7 @@ import systems.project.models.envelopes.VenuesEnvelope;
 import systems.project.services.VenueService;
 
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @CrossOrigin(origins = {"*"})
@@ -23,62 +23,63 @@ public class VenuesApiController implements VenuesApi {
     }
 
     @Override
-    public ResponseEntity<AbstractResponse> addVenue(Venue venue) {
-        try {
-            Map<String, Boolean> res = venueService.addVenue(venue).join();
-            boolean ok = Boolean.TRUE.equals(res.get("status"));
-            if (ok) {
-                return ResponseEntity.ok(
-                        AbstractResponse.builder()
-                                .status("ok")
-                                .title("Успех")
-                                .message("Площадка создана")
+    public CompletableFuture<ResponseEntity<AbstractResponse<Venue>>> addVenue(Venue venue) {
+        return venueService.addVenue(venue)
+                .thenApply(res -> {
+                    boolean ok = res != null && Boolean.TRUE.equals(res.get("status"));
+                    if (ok) {
+                        return ResponseEntity.ok(
+                                AbstractResponse.<Venue>builder()
+                                        .status("ok")
+                                        .title("Успех")
+                                        .message("Площадка создана")
+                                        .data(venue)
+                                        .build()
+                        );
+                    }
+                    return ResponseEntity.badRequest().body(
+                            AbstractResponse.<Venue>builder()
+                                    .status("error")
+                                    .title("Ошибка")
+                                    .message("Ошибка при создании площадки")
+                                    .data(null)
+                                    .build()
+                    );
+                })
+                .exceptionally(ex -> ResponseEntity.badRequest().body(
+                        AbstractResponse.<Venue>builder()
+                                .status("error")
+                                .title("Ошибка")
+                                .message(ex.getMessage())
+                                .data(null)
                                 .build()
-                );
-            }
-            return ResponseEntity.badRequest().body(
-                    AbstractResponse.builder()
-                            .status("error")
-                            .title("Ошибка")
-                            .message("Ошибка при создании площадки")
-                            .build()
-            );
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(
-                    AbstractResponse.builder()
-                            .status("error")
-                            .title("Ошибка")
-                            .message(e.getMessage())
-                            .build()
-            );
-        }
+                ));
     }
 
     @Override
-    public ResponseEntity<AbstractResponse<VenuesEnvelope>> getVenues() {
-        try {
-            Map<String, List<Venue>> map = venueService.getVenues().join();
-            List<Venue> venues = map.get("venues");
-            VenuesEnvelope envelope = new VenuesEnvelope();
-            envelope.setVenueList(venues);
+    public CompletableFuture<ResponseEntity<AbstractResponse<VenuesEnvelope>>> getVenues() {
+        return venueService.getVenues()
+                .thenApply(map -> {
+                    List<Venue> venues = map == null ? null : map.get("venues");
+                    VenuesEnvelope envelope = new VenuesEnvelope();
+                    envelope.setVenueList(venues);
 
-            return ResponseEntity.ok(
-                    AbstractResponse.<VenuesEnvelope>builder()
-                            .status("ok")
-                            .title("Успех")
-                            .message("Список площадок")
-                            .data(envelope)
-                            .build()
-            );
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(
-                    AbstractResponse.<VenuesEnvelope>builder()
-                            .status("error")
-                            .title("Ошибка")
-                            .message(e.getMessage())
-                            .data(null)
-                            .build()
-            );
-        }
+                    return ResponseEntity.ok(
+                            AbstractResponse.<VenuesEnvelope>builder()
+                                    .status("ok")
+                                    .title("Успех")
+                                    .message("Список площадок")
+                                    .data(envelope)
+                                    .build()
+                    );
+                })
+                .exceptionally(ex -> ResponseEntity.badRequest().body(
+                        AbstractResponse.<VenuesEnvelope>builder()
+                                .status("error")
+                                .title("Ошибка")
+                                .message(ex.getMessage())
+                                .data(null)
+                                .build()
+                ));
     }
 }

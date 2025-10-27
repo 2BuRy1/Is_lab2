@@ -1,43 +1,40 @@
 package systems.project;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import systems.project.models.Coordinates;
 import systems.project.models.Person;
 import systems.project.models.Ticket;
 import systems.project.models.TicketType;
+import systems.project.repositories.EventRepository;
+import systems.project.repositories.LocationRepository;
 import systems.project.repositories.PersonRepository;
 import systems.project.repositories.TicketRepository;
+import systems.project.repositories.VenueRepository;
+import systems.project.services.PersonService;
+import systems.project.services.TicketCommandService;
 import systems.project.services.TicketService;
+import systems.project.services.ValidateTypes;
 
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
-
-
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-
-
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
-
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-public class TicketServiceTests {
+class TicketServiceTests {
 
     @Mock
     TicketRepository ticketRepository;
@@ -45,300 +42,265 @@ public class TicketServiceTests {
     @Mock
     PersonRepository personRepository;
 
-    @InjectMocks
-    TicketService service;
+    @Mock
+    EventRepository eventRepository;
+
+    @Mock
+    ValidateTypes validateTypes;
+
+    @Mock
+    VenueRepository venueRepository;
+
+    @Mock
+    LocationRepository locationRepository;
+
+    private TicketCommandService ticketCommandService;
+
+    @Mock
+    PersonService personService;
+
+    private TicketService ticketService;
+    @BeforeEach
+    void setUp() {
+        ticketCommandService = new TicketCommandService(
+                ticketRepository,
+                personRepository,
+                validateTypes,
+                eventRepository,
+                venueRepository,
+                locationRepository
+        );
+        ticketService = new TicketService(ticketCommandService);
+    }
 
     @Test
     void testGetTicket() throws ExecutionException, InterruptedException {
-        //Given
-        Ticket ticket = mock();
+        Ticket ticket = new Ticket();
+        when(ticketRepository.findById(5)).thenReturn(Optional.of(ticket));
 
-        //When
-        when(ticketRepository.findById(any(Integer.class))).thenReturn(CompletableFuture.
-                completedFuture(Optional.of(ticket)));
-        var res = service.getTicket(5).get();
+        var result = ticketService.getTicket(5).get();
 
-        //Then
-        assertEquals(res, ticket);
+        assertEquals(ticket, result);
     }
 
     @Test
-    void testGetEmptyTicket() throws ExecutionException, InterruptedException {
-        //When
-        when(ticketRepository.findById(any(Integer.class))).thenReturn(CompletableFuture.
-                completedFuture(Optional.empty()));
-        var res = service.getTicket(5).get();
+    void testGetTicketEmpty() throws ExecutionException, InterruptedException {
+        when(ticketRepository.findById(5)).thenReturn(Optional.empty());
 
-        assertNull(res);
+        var result = ticketService.getTicket(5).get();
+
+        assertNull(result);
     }
 
     @Test
-    void testFailGetTicket() throws ExecutionException, InterruptedException {
-        //When
-        when(ticketRepository.findById(any(Integer.class))).
-                thenReturn(CompletableFuture.failedFuture(new RuntimeException("fail")));
-        var res = service.getTicket(5).get();
+    void testGetTicketException() throws ExecutionException, InterruptedException {
+        when(ticketRepository.findById(5)).thenThrow(new RuntimeException("fail"));
 
-        //Then
-        assertNull(res);
+        var result = ticketService.getTicket(5).get();
+
+        assertNull(result);
     }
 
     @Test
-    void testUpdateTicket() throws ExecutionException, InterruptedException {
-        //Given
-        Ticket ticket = mock();
+    void testUpdateTicketSuccess() throws ExecutionException, InterruptedException {
+        Ticket ticket = new Ticket();
+        when(ticketRepository.existsById(5)).thenReturn(true);
+        when(ticketRepository.save(any(Ticket.class))).thenReturn(ticket);
 
-        //When
-        when(ticketRepository.existsById(any(Integer.class))).
-                thenReturn(CompletableFuture.completedFuture(true));
-        var res = service.updateTicket(5, ticket).get();
+        var result = ticketService.updateTicket(5, ticket).get();
 
-        //Then
-        assertTrue(res);
-
+        assertTrue(result);
+        verify(ticketRepository).save(ticket);
+        assertEquals(5, ticket.getId());
     }
 
     @Test
-    void testNotFountWhileUpdateTicket() throws ExecutionException, InterruptedException {
-        //Given
-        Ticket ticket = mock();
+    void testUpdateTicketNotFound() throws ExecutionException, InterruptedException {
+        when(ticketRepository.existsById(5)).thenReturn(false);
 
-        //When
-        when(ticketRepository.existsById(any(Integer.class))).
-                thenReturn(CompletableFuture.completedFuture(false));
-        var res = service.updateTicket(5, ticket).get();
+        var result = ticketService.updateTicket(5, new Ticket()).get();
 
-        //Then
-        assertFalse(res);
+        assertFalse(result);
     }
 
     @Test
-    void testFailUpdateTicket() throws ExecutionException, InterruptedException {
-        //Given
-        Ticket ticket = mock();
+    void testUpdateTicketException() throws ExecutionException, InterruptedException {
+        when(ticketRepository.existsById(5)).thenThrow(new RuntimeException("fail"));
 
-        //When
-        when(ticketRepository.existsById(any(Integer.class))).
-                thenReturn(CompletableFuture.failedFuture(new RuntimeException("fail")));
-        var res = service.updateTicket(5, ticket).get();
+        var result = ticketService.updateTicket(5, new Ticket()).get();
 
-        //Then
-        assertFalse(res);
+        assertFalse(result);
     }
 
     @Test
-    void testRemoveTicket() throws ExecutionException, InterruptedException {
-        //When
-        when(ticketRepository.existsById(anyInt())).thenReturn(CompletableFuture.completedFuture(true));
-        when(ticketRepository.deleteById(anyInt())).thenReturn(CompletableFuture.completedFuture(mock()));
-        var res = service.removeTicket(5).get();
+    void testRemoveTicketSuccess() throws ExecutionException, InterruptedException {
+        when(ticketRepository.existsById(7)).thenReturn(true);
 
-        //Then
-        assertTrue(res);
+        var result = ticketService.removeTicket(7).get();
+
+        assertTrue(result);
+        verify(ticketRepository).deleteById(7);
     }
 
     @Test
-    void testNotFoundWhileDelete() throws ExecutionException, InterruptedException {
-        //When
-        when(ticketRepository.existsById(anyInt())).thenReturn(CompletableFuture.completedFuture(false));
-        var res = service.removeTicket(5).get();
+    void testRemoveTicketNotFound() throws ExecutionException, InterruptedException {
+        when(ticketRepository.existsById(7)).thenReturn(false);
 
-        //Then
-        assertFalse(res);
+        var result = ticketService.removeTicket(7).get();
+
+        assertFalse(result);
     }
 
     @Test
-    void testFailDelete() throws Exception {
-        // When
-        when(ticketRepository.existsById(anyInt()))
-                .thenReturn(CompletableFuture.completedFuture(true));
-        doThrow(new RuntimeException("error happened")).when(ticketRepository).deleteById(anyInt());
+    void testRemoveTicketException() throws ExecutionException, InterruptedException {
+        when(ticketRepository.existsById(7)).thenReturn(true);
+        doThrow(new RuntimeException()).when(ticketRepository).deleteById(7);
 
-        var res = service.removeTicket(5).get();
+        var result = ticketService.removeTicket(7).get();
 
-        // Then
-        assertFalse(res);
+        assertFalse(result);
     }
 
     @Test
-    void testDeleteAllByComment() throws Exception {
-        // When
-        when(ticketRepository.deleteByComment("abc")).
-                thenReturn(CompletableFuture.completedFuture(5L));
-        var res = service.deleteAllByComment("abc").get();
+    void testDeleteAllByComment() throws ExecutionException, InterruptedException {
+        when(ticketRepository.deleteByComment("match")).thenReturn(3L);
 
-        // Then
-        assertTrue(res);
+        var result = ticketService.deleteAllByComment("match").get();
+
+        assertTrue(result);
+        verify(ticketRepository).deleteByComment("match");
     }
 
     @Test
-    void testDeleteAllByCommentNone() throws Exception {
-        // When
-        when(ticketRepository.deleteByComment("abc")).
-                thenReturn(CompletableFuture.completedFuture(0L));
-        var res = service.deleteAllByComment("abc").get();
+    void testDeleteAllByCommentNone() throws ExecutionException, InterruptedException {
+        when(ticketRepository.deleteByComment("match")).thenReturn(0L);
 
-        // Then
-        assertFalse(res);
+        var result = ticketService.deleteAllByComment("match").get();
+
+        assertFalse(result);
     }
 
     @Test
-    void testDeleteAllByCommentEmpty() throws Exception {
-        // When
-        var res = service.deleteAllByComment("   ").get();
+    void testDeleteAllByCommentEmpty() throws ExecutionException, InterruptedException {
+        var result = ticketService.deleteAllByComment("   ").get();
 
-        // Then
-        assertFalse(res);
-        verify(ticketRepository, never()).deleteByComment(any());
-    }
-
-
-    @Test
-    void testGetWithMinEvent() throws Exception {
-        // Given
-        Ticket ticket = mock();
-
-        // When
-        when(ticketRepository.findFirstByEventIsNotNullOrderByEventIdAsc()).
-                thenReturn(CompletableFuture.
-                        completedFuture(Optional.of(ticket)));
-        var res = service.getWithMinEvent().get();
-
-        // Then
-        assertEquals(ticket, res);
+        assertFalse(result);
     }
 
     @Test
-    void testGetWithMinEventEmpty() throws Exception {
-        // When
-        when(ticketRepository.findFirstByEventIsNotNullOrderByEventIdAsc()).
-                thenReturn(CompletableFuture.
-                        completedFuture(Optional.empty()));
-        var res = service.getWithMinEvent().get();
+    void testGetWithMinEvent() throws ExecutionException, InterruptedException {
+        Ticket ticket = new Ticket();
+        when(ticketRepository.findFirstByEventIsNotNullOrderByEventIdAsc())
+                .thenReturn(Optional.of(ticket));
 
-        // Then
-        assertNull(res);
-    }
+        var result = ticketService.getWithMinEvent().get();
 
-
-    @Test
-    void testCountByCommentLess() throws Exception {
-        // When
-        when(ticketRepository.countByCommentLessThan("aaa")).
-            thenReturn(CompletableFuture.completedFuture(5L));
-        var res = service.countByCommentLess("aaa").get();
-
-        // Then
-        assertEquals(5L, res.get("count"));
+        assertEquals(ticket, result);
     }
 
     @Test
-    void testFailCountByCommentLess() throws Exception {
-        // When
-        when(ticketRepository.countByCommentLessThan(anyString())).
-                thenReturn(CompletableFuture.failedFuture(new RuntimeException("fail")));
-        var res = service.countByCommentLess("aaa").get();
+    void testGetWithMinEventEmpty() throws ExecutionException, InterruptedException {
+        when(ticketRepository.findFirstByEventIsNotNullOrderByEventIdAsc())
+                .thenReturn(Optional.empty());
 
-        // Then
-        assertEquals(0L, res.get("count"));
+        var result = ticketService.getWithMinEvent().get();
+
+        assertNull(result);
     }
 
+    @Test
+    void testCountByCommentLess() throws ExecutionException, InterruptedException {
+        when(ticketRepository.countByCommentLessThan("abc")).thenReturn(7L);
+
+        var result = ticketService.countByCommentLess("abc").get();
+
+        assertEquals(7L, result.get("count"));
+    }
 
     @Test
-    void testSellTicket() throws Exception {
-        // Given
-        var ticket = new Ticket();
-        var person = new Person();
+    void testCountByCommentLessException() throws ExecutionException, InterruptedException {
+        when(ticketRepository.countByCommentLessThan("abc")).thenThrow(new RuntimeException());
 
-        // When
-        when(ticketRepository.findById(1)).
-                thenReturn(CompletableFuture.
-                        completedFuture(Optional.of(ticket)));
-        when(personRepository.findById(1)).
-                thenReturn(CompletableFuture.
-                        completedFuture(Optional.of(person)));
-        var res = service.sellTicket(1, 1, 100f).get();
+        var result = ticketService.countByCommentLess("abc").get();
 
-        // Then
-        assertTrue(res);
-        assertEquals(100f, ticket.getPrice());
+        assertEquals(0L, result.get("count"));
+    }
+
+    @Test
+    void testSellTicketSuccess() throws ExecutionException, InterruptedException {
+        Ticket ticket = new Ticket();
+        Person person = new Person();
+
+        when(ticketRepository.findById(1)).thenReturn(Optional.of(ticket));
+        when(personRepository.findById(2L)).thenReturn(Optional.of(person));
+        when(ticketRepository.save(any(Ticket.class))).thenReturn(ticket);
+
+        var result = ticketService.sellTicket(1, 2, 150f).get();
+
+        assertTrue(result);
+        assertEquals(150f, ticket.getPrice());
         assertEquals(person, ticket.getPerson());
     }
 
     @Test
-    void testFailSellTicketInvalidAmount() throws Exception {
-        // When
-        var res = service.sellTicket(1, 1, -5f).get();
+    void testSellTicketInvalidAmount() throws ExecutionException, InterruptedException {
+        var result = ticketService.sellTicket(1, 2, -10f).get();
 
-        // Then
-        assertFalse(res);
+        assertFalse(result);
     }
 
     @Test
-    void testFailSellTicketNoTicket() throws Exception {
-        // When
-        when(ticketRepository.findById(1)).
-                thenReturn(CompletableFuture.completedFuture(Optional.empty()));
-        var res = service.sellTicket(1, 1, 50f).get();
+    void testSellTicketNoTicket() throws ExecutionException, InterruptedException {
+        when(ticketRepository.findById(1)).thenReturn(Optional.empty());
 
-        // Then
-        assertFalse(res);
+        var result = ticketService.sellTicket(1, 2, 150f).get();
+
+        assertFalse(result);
     }
 
     @Test
-    void testFailSellTicketNoPerson() throws Exception {
-        // When
-        Ticket ticket = mock();
-        when(ticketRepository.findById(1)).
-                thenReturn(CompletableFuture.
-                        completedFuture(Optional.of(ticket)));
-        when(personRepository.findById(1)).
-                thenReturn(CompletableFuture.
-                        completedFuture(Optional.empty()));
-        var res = service.sellTicket(1, 1, 50f).get();
+    void testSellTicketNoPerson() throws ExecutionException, InterruptedException {
+        Ticket ticket = new Ticket();
+        when(ticketRepository.findById(1)).thenReturn(Optional.of(ticket));
+        when(personRepository.findById(2L)).thenReturn(Optional.empty());
 
-        // Then
-        assertFalse(res);
+        var result = ticketService.sellTicket(1, 2, 150f).get();
+
+        assertFalse(result);
     }
 
-
     @Test
-    void testCloneVip() throws Exception {
-        // Given
-        var ticket = new Ticket();
-        ticket.setId(1);
-        ticket.setName("test");
-        ticket.setPrice(10f);
-        ticket.setCoordinates(new Coordinates());
-        ticket.setType(TicketType.USUAL);
+    void testCloneVipSuccess() throws ExecutionException, InterruptedException {
+        Ticket original = new Ticket();
+        original.setId(15);
+        original.setName("Original");
+        original.setPrice(20f);
+        original.setType(TicketType.USUAL);
+        Coordinates coords = new Coordinates();
+        coords.setX(1);
+        coords.setY(2f);
+        original.setCoordinates(coords);
 
-        // When
-        when(ticketRepository.findById(1)).
-                thenReturn(CompletableFuture.
-                        completedFuture(Optional.of(ticket)));
-        when(ticketRepository.save(any(Ticket.class))).thenAnswer(inv -> inv.getArgument(0));
-        var copy = service.cloneVip(1).get();
+        when(ticketRepository.findById(15)).thenReturn(Optional.of(original));
+        when(ticketRepository.save(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        // Then
+        var copy = ticketService.cloneVip(15).get();
+
         assertNotNull(copy);
-        assertEquals("test", copy.getName());
-        assertEquals(20f, copy.getPrice());
-        assertEquals(TicketType.VIP, copy.getType());
         assertNull(copy.getId());
+        assertEquals("Original", copy.getName());
+        assertEquals(40f, copy.getPrice());
+        assertEquals(TicketType.VIP, copy.getType());
+        assertNotNull(copy.getCoordinates());
+        assertNotSame(coords, copy.getCoordinates());
     }
 
     @Test
-    void testCloneVipNotFound() throws Exception {
-        // When
-        when(ticketRepository.findById(1)).
-                thenReturn(CompletableFuture.
-                        completedFuture(Optional.empty()));
-        var res = service.cloneVip(1).get();
+    void testCloneVipNotFound() throws ExecutionException, InterruptedException {
+        when(ticketRepository.findById(10)).thenReturn(Optional.empty());
 
-        // Then
-        assertNull(res);
+        var copy = ticketService.cloneVip(10).get();
+
+        assertNull(copy);
     }
-
-
-
 }

@@ -28,10 +28,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import systems.project.models.Ticket;
 import systems.project.models.api.AbstractResponse;
 import systems.project.models.api.CloneRequest;
+import systems.project.models.api.ImportResult;
 import systems.project.models.api.SellRequestDTO;
 import systems.project.models.envelopes.TicketsEnvelope;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 @Generated(value = "org.openapitools.codegen.languages.SpringCodegen",
         date = "2025-09-21T19:04:05.004649+03:00[Europe/Moscow]",
@@ -47,9 +50,9 @@ public interface TicketsApi {
     /**
      * POST /add_ticket : Создать билет
      *
-     * @param ticket  (required)
+     * @param ticket (required)
      * @return Создано (status code 200)
-     *         or Ошибка валидации/создания (status code 400)
+     * or Ошибка валидации/создания (status code 400)
      */
     @Operation(
         operationId = "addTicket",
@@ -70,8 +73,7 @@ public interface TicketsApi {
         produces = { "application/json" },
         consumes = { "application/json" }
     )
-    
-     ResponseEntity<AbstractResponse> addTicket(
+    CompletableFuture<ResponseEntity<AbstractResponse<Ticket>>> addTicket(
         @Parameter(name = "Ticket", description = "", required = true) @Valid @RequestBody Ticket ticket
     );
 
@@ -103,7 +105,7 @@ public interface TicketsApi {
         consumes = { "application/json" }
     )
     
-    ResponseEntity<AbstractResponse<Ticket>> cloneVip(
+    CompletableFuture<ResponseEntity<AbstractResponse<Ticket>>> cloneVip(
         @Parameter(name = "CloneRequest",
                 description = "",
                 required = true)
@@ -138,7 +140,7 @@ public interface TicketsApi {
         produces = { "application/json" }
     )
     
-    ResponseEntity<AbstractResponse<Integer>> countCommentLess(
+    CompletableFuture<ResponseEntity<AbstractResponse<Integer>>> countCommentLess(
         @NotNull @Parameter(name = "comment",
                 description = "",
                 required = true,
@@ -172,7 +174,7 @@ public interface TicketsApi {
         produces = { "application/json" }
     )
     
-    ResponseEntity<AbstractResponse> deleteByComment(
+    CompletableFuture<ResponseEntity<AbstractResponse<Void>>> deleteByComment(
         @NotNull @Parameter(name = "commentEq",
                 description = "",
                 required = true,
@@ -207,7 +209,7 @@ public interface TicketsApi {
         produces = { "application/json" }
     )
     
-     ResponseEntity<AbstractResponse> deleteTicket(
+    CompletableFuture<ResponseEntity<AbstractResponse<Void>>> deleteTicket(
         @Parameter(name = "id", description = "", required = true, in = ParameterIn.PATH) @PathVariable("id") Integer id
     );
 
@@ -238,7 +240,7 @@ public interface TicketsApi {
         produces = { "application/json" }
     )
     
-     ResponseEntity<AbstractResponse<Ticket>> getTicketById(
+    CompletableFuture<ResponseEntity<AbstractResponse<Ticket>>> getTicketById(
         @Parameter(name = "id", description = "", required = true, in = ParameterIn.PATH) @PathVariable("id") Integer id
     );
 
@@ -267,7 +269,40 @@ public interface TicketsApi {
         produces = { "application/json" }
     )
     
-    ResponseEntity<AbstractResponse<TicketsEnvelope>> getTickets(
+    CompletableFuture<ResponseEntity<AbstractResponse<TicketsEnvelope>>> getTickets();
+
+
+    /**
+     * POST /tickets/import : Импортировать список билетов
+     *
+     * @param ticketList  (required)
+     * @return Импорт завершён (status code 200)
+     *         or Ошибка импорта (status code 400)
+     */
+    @Operation(
+        operationId = "importTickets",
+        summary = "Импортировать список билетов",
+        tags = { "Tickets" },
+        responses = {
+            @ApiResponse(responseCode = "200", description = "Импорт завершён", content = {
+                @Content(mediaType = "application/json", schema = @Schema(implementation = AbstractResponse.class))
+            }),
+            @ApiResponse(responseCode = "400", description = "Ошибка импорта", content = {
+                @Content(mediaType = "application/json", schema = @Schema(implementation = AbstractResponse.class))
+            })
+        }
+    )
+    @RequestMapping(
+        method = RequestMethod.POST,
+        value = "/tickets/import",
+        produces = { "application/json" },
+        consumes = { "application/json" }
+    )
+    
+    CompletableFuture<ResponseEntity<AbstractResponse<ImportResult>>> importTickets(
+        @Parameter(name = "ticketList", description = "", required = true)
+        @Valid
+        @RequestBody List<Ticket> ticketList
     );
 
 
@@ -296,8 +331,7 @@ public interface TicketsApi {
         produces = { "application/json" }
     )
     
-     ResponseEntity<AbstractResponse<Ticket>> minEventTicket(
-    );
+    CompletableFuture<ResponseEntity<AbstractResponse<Ticket>>> minEventTicket();
 
 
     /**
@@ -327,7 +361,7 @@ public interface TicketsApi {
         consumes = { "application/json" }
     )
     
-     ResponseEntity<AbstractResponse> sellTicket(
+    CompletableFuture<ResponseEntity<AbstractResponse<Void>>> sellTicket(
         @Parameter(name = "SellRequestDTO",
                 description = "",
                 required = true)
@@ -394,7 +428,7 @@ public interface TicketsApi {
         consumes = { "application/json" }
     )
     
-     ResponseEntity<AbstractResponse> updateTicket(
+    CompletableFuture<ResponseEntity<AbstractResponse<Void>>> updateTicket(
         @Parameter(name = "id",
                 description = "",
                 required = true,

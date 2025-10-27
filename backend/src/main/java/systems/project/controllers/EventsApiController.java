@@ -10,7 +10,7 @@ import systems.project.models.envelopes.EventsEnvelope;
 import systems.project.services.EventService;
 
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @CrossOrigin(origins = {"*"})
@@ -23,62 +23,63 @@ public class EventsApiController implements EventsApi {
     }
 
     @Override
-    public ResponseEntity<AbstractResponse> addEvent(Event event) {
-        try {
-            Map<String, Boolean> res = service.addEvent(event).join();
-            boolean ok = Boolean.TRUE.equals(res.get("status"));
-            if (ok) {
-                return ResponseEntity.ok(
-                        AbstractResponse.builder()
-                                .status("ok")
-                                .title("Успех")
-                                .message("Событие создано")
+    public CompletableFuture<ResponseEntity<AbstractResponse<Event>>> addEvent(Event event) {
+        return service.addEvent(event)
+                .thenApply(res -> {
+                    boolean ok = res != null && Boolean.TRUE.equals(res.get("status"));
+                    if (ok) {
+                        return ResponseEntity.ok(
+                                AbstractResponse.<Event>builder()
+                                        .status("ok")
+                                        .title("Успех")
+                                        .message("Событие создано")
+                                        .data(event)
+                                        .build()
+                        );
+                    }
+                    return ResponseEntity.badRequest().body(
+                            AbstractResponse.<Event>builder()
+                                    .status("error")
+                                    .title("Ошибка")
+                                    .message("Ошибка при создании события")
+                                    .data(null)
+                                    .build()
+                    );
+                })
+                .exceptionally(ex -> ResponseEntity.badRequest().body(
+                        AbstractResponse.<Event>builder()
+                                .status("error")
+                                .title("Ошибка")
+                                .message(ex.getMessage())
+                                .data(null)
                                 .build()
-                );
-            }
-            return ResponseEntity.badRequest().body(
-                    AbstractResponse.builder()
-                            .status("error")
-                            .title("Ошибка")
-                            .message("Ошибка при создании события")
-                            .build()
-            );
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(
-                    AbstractResponse.builder()
-                            .status("error")
-                            .title("Ошибка")
-                            .message(e.getMessage())
-                            .build()
-            );
-        }
+                ));
     }
 
     @Override
-    public ResponseEntity<AbstractResponse<EventsEnvelope>> getEvents() {
-        try {
-            Map<String, List<Event>> map = service.getEvents().join();
-            List<Event> events = map.get("events");
-            EventsEnvelope envelope = new EventsEnvelope();
-            envelope.setEventList(events);
+    public CompletableFuture<ResponseEntity<AbstractResponse<EventsEnvelope>>> getEvents() {
+        return service.getEvents()
+                .thenApply(map -> {
+                    List<Event> events = map == null ? null : map.get("events");
+                    EventsEnvelope envelope = new EventsEnvelope();
+                    envelope.setEventList(events);
 
-            return ResponseEntity.ok(
-                    AbstractResponse.<EventsEnvelope>builder()
-                            .status("ok")
-                            .title("Успех")
-                            .message("Список событий")
-                            .data(envelope)
-                            .build()
-            );
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(
-                    AbstractResponse.<EventsEnvelope>builder()
-                            .status("error")
-                            .title("Ошибка")
-                            .message(e.getMessage())
-                            .data(null)
-                            .build()
-            );
-        }
+                    return ResponseEntity.ok(
+                            AbstractResponse.<EventsEnvelope>builder()
+                                    .status("ok")
+                                    .title("Успех")
+                                    .message("Список событий")
+                                    .data(envelope)
+                                    .build()
+                    );
+                })
+                .exceptionally(ex -> ResponseEntity.badRequest().body(
+                        AbstractResponse.<EventsEnvelope>builder()
+                                .status("error")
+                                .title("Ошибка")
+                                .message(ex.getMessage())
+                                .data(null)
+                                .build()
+                ));
     }
 }
